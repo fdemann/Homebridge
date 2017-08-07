@@ -1,0 +1,51 @@
+{
+    "bridge": {
+        "name": "Homebridge",
+        "username": "A0:63:91:E8:6C:B8",
+        "port": 51826,
+        "pin": "031-45-155"
+    },
+    "description": "There are some fake accessories",
+
+    "platforms": [
+        {
+            "platform" : "mqttCtrlPlatform",
+            "name" : "MQTT Control",
+            "overrideCache" : "true",
+            "MQTT_url": "mqtt://192.168.0.1",
+            "MQTT_usr": "test",
+            "MQTT_pwd": "test",
+            "gwID" : "gatewayID",
+            "objects" : [
+                {
+                    "type" : "scene",
+                    "name" : "Start Meeting",
+                    "id"  : "100"
+                },
+                {
+                    "type" : "scene",
+                    "name" : "Close Meeting",
+                    "id"  : "101"
+                },
+                {
+                    "type" : "device",
+                    "name" : "light",
+                    "id"  : "89D3E908004B1200"
+                },
+                {
+                    "type" : "device",
+                    "name" : "AC",
+                    "id"  : "48CF1E07004B12002B"
+                },
+                {
+                    "type" : "sensor",
+                    "name" : "sensor",
+                    "id"  : "2FEDDF03004B1200"
+                }
+            ]
+        }
+    ],
+
+   "accessories": [
+    ]
+}
