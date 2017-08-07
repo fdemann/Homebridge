@@ -81,6 +81,49 @@ ThermostatAccessory.prototype.getCurrentHeatingCoolingState = function(callback)
 }
 
 
+/*--------------------------------------------------------------------------------------------------------------------------------------------------------------
+//these should be the setProperty messages (change for example the temperature)
+//this set property code is more similar to the setCharacteristic ocd ein the sensorSAccessory.js filter
+//HOwever it is unclear where the setCharacteristic mqtt message is definded
+--------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+
+
+SensorAccessory.prototype.processMQTT = function(json) {
+    var self = this;
+    var thermostatService = this.accessory.getService(Service.Thermostat);
+
+    //this.log("SensorAccessory processMQTT:" + json);
+
+    if(this.context.id == json.device.address)
+    {
+        this.temperature = parseFloat(json.device.properties.temperature);
+        temperatureService.setCharacteristic(Characteristic.CurrentTemperature, self.temperature);
+
+        this.humidity = parseFloat(json.device.properties.humidity);
+        humidityService.setCharacteristic(Characteristic.CurrentRelativeHumidity, self.humidity);
+
+        this.pm2_5 = parseInt(json.device.properties.PM2_5);
+        airQualityService.setCharacteristic(Characteristic.PM2_5Density, self.pm2_5);
+        airQualityService.setCharacteristic(Characteristic.AirQuality, IdxParse(self.pm2_5));
+
+        this.batteryLevel = parseInt(json.device.properties.batteryPercent);
+        batteryService.setCharacteristic(Characteristic.BatteryLevel, self.batteryLevel);
+        if(this.batteryLevel < 20)
+        {
+            this.statusLowBattery = Characteristic.StatusLowBattery.BATTERY_LEVEL_LOW;
+            batteryService.setCharacteristic(Characteristic.BatteryLevel, self.statusLowBattery);
+        }
+        else
+        {
+            this.statusLowBattery = Characteristic.StatusLowBattery.BATTERY_LEVEL_NORMAL;
+            batteryService.setCharacteristic(Characteristic.BatteryLevel, self.statusLowBattery);
+        }
+    }
+}
+
+
+
+
 
 
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -100,6 +143,8 @@ ThermostatAccessory.prototype.getCurrentHeatingCoolingState = function(callback)
     callback();
 }*/
 
+
+/*
 ThermostatAccessory.prototype.setTargetHeatingCoolingState = function(TargetHeatingCoolingState, callback, context) {
     if(context !== 'fromSetValue') {
       this.TargetHeatingCoolingState = TargetHeatingCoolingState;
@@ -129,7 +174,7 @@ ThermostatAccessory.prototype.getServices = function() {
 }
 
 
-
+*/
 
 
 //for fan speed implementation
