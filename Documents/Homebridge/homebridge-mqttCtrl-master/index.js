@@ -1,6 +1,6 @@
 'use strict';
 
-var SceneAccessory, DeviceAccessory, SensorAccessory;
+var SceneAccessory, DeviceAccessory, SensorAccessory ThermostatAccessory;
 
 var Accessory, Service, Characteristic, UUIDGen;
 
@@ -16,7 +16,7 @@ const SENSOR_OBJ_TYPE = "sensor";
 
 //what sort of device is this?; is it supported ==> if not scene or device then not spported
 var is_supported_type = function(v) {
-    return v === SCENE_OBJ_TYPE || v === DEVICE_OBJ_TYPE || v === SENSOR_OBJ_TYPE;
+    return v === SCENE_OBJ_TYPE || v === DEVICE_OBJ_TYPE || v === SENSOR_OBJ_TYPE || v === THEROSTAT_OBJ_TYPE;
 }
 
 module.exports = function(homebridge) {
@@ -46,6 +46,7 @@ function mqttCtrlPlatform(log, config, api) {
     this.sceneAccessoryArray = [];
     this.deviceAccessoryArray = [];
     this.sensorAccessoryArray = [];
+    this.thermostatAccessoryArray = [];
 
     this.url = config["MQTT_url"];
     this.publish_options = {
@@ -122,11 +123,22 @@ function mqttCtrlPlatform(log, config, api) {
                         var sensorObj = sensorObjs[index];
                         sensorObj.processMQTT(jsonObj);
                     }
+
+                    //Thermostat/AC
+                    var thermoObjs = that.thermostatAccessoryArray.filter(function(item) {
+                        return item.context.id == jsonObj.device.address && item.context.type == THERMOSTAT_OBJ_TYPE;
+                    });
+
+                    for (var index in thermoObjs) {
+                        var thermoObj = thermoObjs[index];
+                        thermoObj.processMQTT(jsonObj);
+                    }
                 }
                 else if(jsonObj.message === "device properties changed" )
                 {
                     //that.log(topic +":[" + message.toString()+"].");
 
+                    //Sensor
                     var sensorObjs = that.sensorAccessoryArray.filter(function(item) {
                         return item.context.id == jsonObj.device.address && item.context.type == SENSOR_OBJ_TYPE;
                     });
@@ -134,6 +146,16 @@ function mqttCtrlPlatform(log, config, api) {
                     for (var index in sensorObjs) {
                         var sensorObj = sensorObjs[index];
                         sensorObj.processMQTT(jsonObj);
+                    }
+
+                    //Thermostat/AC
+                    var thermoObjs = that.thermostatAccessoryArray.filter(function(item) {
+                        return item.context.id == jsonObj.device.address && item.context.type == THERMOSTAT_OBJ_TYPE;
+                    });
+
+                    for (var index in thermoObjs) {
+                        var thermoObj = thermoObjs[index];
+                        thermoObj.processMQTT(jsonObj);
                     }
                 }
             } catch(e) {

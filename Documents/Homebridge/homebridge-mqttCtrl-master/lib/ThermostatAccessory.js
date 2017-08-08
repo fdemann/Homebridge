@@ -26,15 +26,46 @@ function SensorAccessory(log, accessory) {
 
   this.accessory = accessory;
   this.log = log;
-  this.context = accessory.context;*/
+  this.context = accessory.context;
 
 
 }
 
 
+
 //check if this is actually ok
 
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+**************************************************************************************************************************************************************************************
+//Status messages
+***********************************************************************************************************************************************************************************
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+ThermostatAccessory.prototype.getStatus = function(callback) {
+    var self = this;
 
+    this.log("ThermostatAccessory(" + this.context.id + ") getStatus" );
+    callback(null, self.status);
+}
+
+ThermostatAccessory.prototype.setStatus = function(status, callback, context) {
+    this.log("ThermostatAccessory(" + this.context.id + ") setStatus:" + status );
+
+    if(context !== 'fromSetValue') {
+        var st = status?"On":"Off";
+        var mqttMsg = '{"message":"set status","device":{"address":"' + this.context.id + '","status":"' + st + '"}}';
+        //this.mqttClient("test");
+
+        this.mqttClient.publish(this.pubTopic, mqttMsg, {qos:1});
+    }
+    callback();
+}
+
+
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+**************************************************************************************************************************************************************************************
+//Property messages
+***********************************************************************************************************************************************************************************
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------
 //These should be the getProperty messages (what is the current status of the AC)
@@ -45,7 +76,7 @@ function SensorAccessory(log, accessory) {
 }*/
 
 ThermostatAccessory.prototype.getTargetHeatingCoolingState = function(callback) {
-    var self = this; //not sure if this and next line is necessary
+    var self = this; //not sure if this and next line is necessary; i think just for debugging
     this.log("ThermostatAccessory(" + this.context.id + ") getTargetHeatingCoolingState " + this.targetHeatingCoolingState);
     callback(null, this.TargetHeatingCoolingState);
 }
@@ -81,55 +112,10 @@ ThermostatAccessory.prototype.getCurrentHeatingCoolingState = function(callback)
 }
 
 
-/*--------------------------------------------------------------------------------------------------------------------------------------------------------------
-//these should be the setProperty messages (change for example the temperature)
-//this set property code is more similar to the setCharacteristic ocd ein the sensorSAccessory.js filter
-//HOwever it is unclear where the setCharacteristic mqtt message is definded
---------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-
-
-SensorAccessory.prototype.processMQTT = function(json) {
-    var self = this;
-    var thermostatService = this.accessory.getService(Service.Thermostat);
-
-    //this.log("SensorAccessory processMQTT:" + json);
-
-    if(this.context.id == json.device.address)
-    {
-        this.temperature = parseFloat(json.device.properties.temperature);
-        temperatureService.setCharacteristic(Characteristic.CurrentTemperature, self.temperature);
-
-        this.humidity = parseFloat(json.device.properties.humidity);
-        humidityService.setCharacteristic(Characteristic.CurrentRelativeHumidity, self.humidity);
-
-        this.pm2_5 = parseInt(json.device.properties.PM2_5);
-        airQualityService.setCharacteristic(Characteristic.PM2_5Density, self.pm2_5);
-        airQualityService.setCharacteristic(Characteristic.AirQuality, IdxParse(self.pm2_5));
-
-        this.batteryLevel = parseInt(json.device.properties.batteryPercent);
-        batteryService.setCharacteristic(Characteristic.BatteryLevel, self.batteryLevel);
-        if(this.batteryLevel < 20)
-        {
-            this.statusLowBattery = Characteristic.StatusLowBattery.BATTERY_LEVEL_LOW;
-            batteryService.setCharacteristic(Characteristic.BatteryLevel, self.statusLowBattery);
-        }
-        else
-        {
-            this.statusLowBattery = Characteristic.StatusLowBattery.BATTERY_LEVEL_NORMAL;
-            batteryService.setCharacteristic(Characteristic.BatteryLevel, self.statusLowBattery);
-        }
-    }
-}
-
-
-
-
-
 
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------
 //these should be the setProperty messages (change for example the temperature)
 //this is version 1; source code for this version can be found at https://github.com/chaeplin/homebridge-mqtt-nest-thermostat/blob/master/index.js
-// will is replaced with code above, as that code is more similar to SensorAccessory.js
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 
 
@@ -144,37 +130,101 @@ SensorAccessory.prototype.processMQTT = function(json) {
 }*/
 
 
-/*
-ThermostatAccessory.prototype.setTargetHeatingCoolingState = function(TargetHeatingCoolingState, callback, context) {
+//maybe can just set on auto, else if else statement
+/*ThermostatAccessory.prototype.setTargetHeatingCoolingState = function(TargetHeatingCoolingState, callback, context) {
     if(context !== 'fromSetValue') {
       this.TargetHeatingCoolingState = TargetHeatingCoolingState;
+      //var mqttMsg = '{"message":"set properties","device":{"address":"' + this.context.id + '","type":"AirCondition","status":"On","properties":{"temperature":' String(this.CurrentTemperature)'}}}'
+
+
       this.client.publish(this.topics.set + 'setTargetHeatingCoolingState', String(this.TargetHeatingCoolingState), this.options_publish);
     }
     callback();
-}
+}*/
 
 ThermostatAccessory.prototype.setTargetTemperature = function(TargetTemperature, callback, context) {
     if(context !== 'fromSetValue') {
       this.TargetTemperature = TargetTemperature;
-      this.client.publish(this.topics.set + 'setTargetTemperature', String(this.TargetTemperature), this.options_publish);
+
+      //var mqttMsg = '{"message":"set properties","device":{"address":"' + this.context.id + '","type":"AirCondition","status":"On","properties":{"temperature":'String(this.TargetTemperature)',"mode":"0","speed":"0","direction":"0","change":"temperature"}}}'
+
+      this.client.publish(this.topics.set + '{"message":"set properties","device":{"address":"' + this.context.id + '","type":"AirCondition","status":"On","properties":{"temperature":'String(this.TargetTemperature)',"mode":"0","speed":"0","direction":"0","change":"temperature"}}}'), this.options_publish);
       //this.client.publish(this.topic_for_esp8266, '{"ac_temp":' + String(this.TargetTemperature) + '}', this.options_publish);
     }
     callback();
 }
 
+//Question: Do I have to use the setTargetTemperature or the change ("Temperature")
+
+
+
+
+/*--------------------------------------------------------------------------------------------------------------------------------------------------------------
+//this code is just used to update the variables defined at the beginning of thermostat accessory.js and that the code in the next section is still
+//to actually change the properties of the device; this would make sense as you cannot really change the properties of a sensor
+--------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+
+//unresolved
+thermostatAccessory.prototype.processMQTT = function(json) {
+    var self = this;
+    var thermostatService = this.accessory.getService(Service.Thermostat);
+
+    //this.log("SensorAccessory processMQTT:" + json);
+
+    /*if(this.context.id == json.device.address)
+    {   //maybe target services dont have to be set again since they have been aready set above; if this werent the case, might be problematic as 1, no property in json message for them and 2, would maybe conflict with the setCharacteristic afrom above
+        //(user sets characteristic and then it is changed right away; maybe use for these two the alternative code below; or right directly in set message)
+
+
+        this.TargetTemperature = parseFloat(json.device.properties.temperature); //i think up here self.mode is expectet as it uses mqtt message, so AC properties are needed; chek StatusLowBattery to see how to deal with servicethat isnt defined in the properties
+        thermostatService.setCharacteristic(Characteristic.TargetTemperature, self.mode); //not sure if mode is correct (or what self. means; might be that if have to input again target temp); Edit: seems as if i have to use the name from beginning variable
+
+        this.TargetHeatingCoolingState = parseFloat(json.device.properties.humidity);
+        humidityService.setCharacteristic(Characteristic.CurrentRelativeHumidity, self.humidity);
+
+        if (json.device.propertie.)
+
+    }*/
+    if(this.context.id == json.device.address)
+    {
+        if(json.device.status === "On")
+        {
+            this.status = true;
+        }
+        else
+        {
+            this.status = false;
+        }
+
+        //thermostatService.getCharacteristic(FanSpeedCharacteristic).setValue(that.CurrentFanSpeed, undefined, 'fromSetValue');
+        thermostatService.getCharacteristic(Characteristic.TargetHeatingCoolingState).setValue(that.TargetHeatingCoolingState, undefined, 'fromSetValue');
+        thermostatService.getCharacteristic(Characteristic.TargetTemperature).setValue(that.TargetTemperature, undefined, 'fromSetValue');
+        thermostatService.getCharacteristic(Characteristic.CurrentTemperature).setValue(that.CurrentTemperature, undefined, 'fromSetValue');
+        //thermostatService.getCharacteristic(Characteristic.CurrentRelativeHumidity).setValue(that.CurrentRelativeHumidity, undefined, 'fromSetValue');
+        thermostatService.getCharacteristic(Characteristic.CurrentHeatingCoolingState).setValue(that.CurrentHeatingCoolingState, undefined, 'fromSetValue');
+
+}
 
 
 
 
 
 
+
+
+
+
+
+
+
+/*
 //?
 ThermostatAccessory.prototype.getServices = function() {
   return [this.service];
 }
 
-
 */
+
 
 
 //for fan speed implementation

@@ -28,12 +28,12 @@ DeviceAccessory.prototype.getStatus = function(callback) {
 
 DeviceAccessory.prototype.setStatus = function(status, callback, context) {
     this.log("DeviceAccessory(" + this.context.id + ") setStatus:" + status );
-    
+
     if(context !== 'fromSetValue') {
         var st = status?"On":"Off";
         var mqttMsg = '{"message":"set status","device":{"address":"' + this.context.id + '","status":"' + st + '"}}';
         //this.mqttClient("test");
-        
+
         this.mqttClient.publish(this.pubTopic, mqttMsg, {qos:1});
     }
     callback();
@@ -44,7 +44,7 @@ DeviceAccessory.prototype.processMQTT = function(json) {
     var switchService = this.accessory.getService(Service.Switch);
 
     this.log("DeviceAccessory processMQTT id:" + json.device.address );
-    
+
     if(this.context.id == json.device.address)
     {
         if(json.device.status === "On")
@@ -55,7 +55,7 @@ DeviceAccessory.prototype.processMQTT = function(json) {
         {
             this.status = false;
         }
-        
+
         switchService.getCharacteristic(Characteristic.On)
             .setValue(self.status, undefined, 'fromSetValue');
     }
