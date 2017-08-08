@@ -184,7 +184,7 @@ function mqttCtrlPlatform(log, config, api) {
     }
 }
 
-// Sample function to show how developer can add accessory dynamically from outside event
+// Sample function to show how developer can add accessory dynamically from outside event.
 mqttCtrlPlatform.prototype.addObject = function(object) {
     var platform = this;
     var uuid;
