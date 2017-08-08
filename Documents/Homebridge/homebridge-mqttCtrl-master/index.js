@@ -1,6 +1,6 @@
 'use strict';
 
-var SceneAccessory, DeviceAccessory, SensorAccessory ThermostatAccessory;
+var SceneAccessory, DeviceAccessory, SensorAccessory;
 
 var Accessory, Service, Characteristic, UUIDGen;
 
@@ -13,10 +13,10 @@ const CON_TIMEOUT = 5 * 1000;
 const SCENE_OBJ_TYPE = "scene";
 const DEVICE_OBJ_TYPE = "device";
 const SENSOR_OBJ_TYPE = "sensor";
+const THERMOSTAT_OBJ_TYPE = "thermostat"
 
-//what sort of device is this?; is it supported ==> if not scene or device then not spported
 var is_supported_type = function(v) {
-    return v === SCENE_OBJ_TYPE || v === DEVICE_OBJ_TYPE || v === SENSOR_OBJ_TYPE || v === THEROSTAT_OBJ_TYPE;
+    return v === SCENE_OBJ_TYPE || v === DEVICE_OBJ_TYPE || v === SENSOR_OBJ_TYPE || v === THERMOSTAT_OBJ_TYPE;
 }
 
 module.exports = function(homebridge) {
@@ -31,9 +31,10 @@ module.exports = function(homebridge) {
     SceneAccessory = require('./lib/SceneAccessory.js')(Accessory, Service, Characteristic);
     DeviceAccessory = require('./lib/DeviceAccessory.js')(Accessory, Service, Characteristic);
     SensorAccessory = require('./lib/SensorAccessory.js')(Accessory, Service, Characteristic);
-    ThermostatAccessory = require(".lib/ThermostatAccessory.js")(Accessory, Service, Characteristic);
+    ThermostatAccessory = require('.lib/ThermostatAccessory.js')(Accessory, Service, Characteristic);
 
-    homebridge.registerPlatform("homebridge-mqttCtrl", "mqttCtrlPlatform", mqttCtrlPlatform, false); //references homebridge to mqtt platform (see platform constructor)
+
+    homebridge.registerPlatform("homebridge-mqttCtrl", "mqttCtrlPlatform", mqttCtrlPlatform, false);
 }
 
 // Platform constructor
@@ -48,10 +49,11 @@ function mqttCtrlPlatform(log, config, api) {
     this.sensorAccessoryArray = [];
     this.thermostatAccessoryArray = [];
 
+
     this.url = config["MQTT_url"];
     this.publish_options = {
         qos: 1
-    }; //MQTT setup; what does api mean
+    };
     this.options = {
         keepalive: 10,
         clientId: "mqttCtrl_" + Math.random().toString(16).substr(2, 6),
@@ -63,7 +65,7 @@ function mqttCtrlPlatform(log, config, api) {
         username: config["MQTT_usr"],
         password: config["MQTT_pwd"],
         rejectUnauthorized: false
-    }; //subscribe to topics
+    };
     this.topicSub    = config["gwID"]+"/response/+";
     this.topicPub    = config["gwID"]+"/request/" + this.options.clientId;
 
@@ -82,7 +84,6 @@ function mqttCtrlPlatform(log, config, api) {
     this.client.on('message', function (topic, message) {
         //that.log(topic +":[" + message.toString()+"].");
 
-//response from gateway
         var response = message.toString();
         if(response) {
             try {
@@ -138,7 +139,7 @@ function mqttCtrlPlatform(log, config, api) {
                 {
                     //that.log(topic +":[" + message.toString()+"].");
 
-                    //Sensor
+                    //sensor
                     var sensorObjs = that.sensorAccessoryArray.filter(function(item) {
                         return item.context.id == jsonObj.device.address && item.context.type == SENSOR_OBJ_TYPE;
                     });
@@ -262,7 +263,7 @@ mqttCtrlPlatform.prototype.configureAccessory = function(accessory) {
 
                 accessory.getService(Service.Switch)
                   .getCharacteristic(Characteristic.On)
-                  .on('get', deviceAccessory.getStatus.bind(deviceAccessory))//callback to function in device library ==> get status when opening app; function translates to mqtt
+                  .on('get', deviceAccessory.getStatus.bind(deviceAccessory))
                   .on('set', deviceAccessory.setStatus.bind(deviceAccessory));
 
                 var reqStatusMsg = '{"message":"request status","device":{"address":"' + object.id + '"}}';
@@ -338,24 +339,18 @@ mqttCtrlPlatform.prototype.configureAccessory = function(accessory) {
                 this.mqttPub(reqStatusMsg);
             }
             break;
-        case THEROSTAT_OBJ_TYPE:
-          {
-                if(!accessory.getService(Service.Thermostat))
-                  {
-                    accessory.addService(Service.Thermostat, object.name);
-                  }
+            case THEROSTAT_OBJ_TYPE:
+              {
+                    if(!accessory.getService(Service.Thermostat))
+                      {
+                        accessory.addService(Service.Thermostat, object.name);
+                      }
 
-                var thermostatAccessory = new ThermostatAccessory(platform.log, accessory, Service, Characteristic);
-                platform.thermostatAccessoryArray.push(thermostatAccessory);
+                    var thermostatAccessory = new ThermostatAccessory(platform.log, accessory, Service, Characteristic);
+                    platform.thermostatAccessoryArray.push(thermostatAccessory);
 
-                //this.service = new Service.Thermostat(this.name);//probably replace with accessory constructor (see sensor wth new sensorAccessory)
-/*
-                this.service.addCharacteristic(FanSpeedCharacteristic);
-                this.service.getCharacteristic(FanSpeedCharacteristic)
-                  .on('get', this.getFanSpeed.bind(this))
-                  .on('set', this.setFanSpeed.bind(this)); */
 
-                accessory.service.getCharacteristic(Characteristic.TargetTemperature)
+                    accessory.service.getCharacteristic(Characteristic.TargetTemperature)
                   .setProps({
                       maxValue: 30,
                       minValue: 18,
@@ -378,14 +373,6 @@ mqttCtrlPlatform.prototype.configureAccessory = function(accessory) {
 
                 accessory.service.getCharacteristic(Characteristic.TemperatureDisplayUnits)
                   .on('get', this.getTemperatureDisplayUnits.bind(this));
-/*
-                this.service.getCharacteristic(Characteristic.CurrentRelativeHumidity)
-                  .setProps({
-                    maxValue: 100,
-                    minValue: 0,
-                    minStep: 0.01
-                    })
-                  .on('get', this.getCurrentRelativeHumidity.bind(this));*/
 
                 accessory.service.getCharacteristic(Characteristic.CurrentHeatingCoolingState)
                   .on('get', this.getCurrentHeatingCoolingState.bind(this));
@@ -413,7 +400,6 @@ mqttCtrlPlatform.prototype.configureAccessory = function(accessory) {
     this.accessories.push(accessory);
 }
 
-//not important
 //Handler will be invoked when user try to config your plugin
 //Callback can be cached and invoke when necessary
 mqttCtrlPlatform.prototype.configurationRequestHandler = function(context, request, callback) {

@@ -33,7 +33,7 @@
                     "id"  : "89D3E908004B1200"
                 },
                 {
-                    "type" : "device",
+                    "type" : "thermostat",
                     "name" : "AC",
                     "id"  : "48CF1E07004B12002B"
                 },
