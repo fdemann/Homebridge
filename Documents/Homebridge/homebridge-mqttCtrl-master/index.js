@@ -1,6 +1,6 @@
 'use strict';
 
-var SceneAccessory, DeviceAccessory, SensorAccessory;
+var SceneAccessory, DeviceAccessory, SensorAccessory, ThermostatAccessory;
 
 var Accessory, Service, Characteristic, UUIDGen;
 
@@ -31,7 +31,7 @@ module.exports = function(homebridge) {
     SceneAccessory = require('./lib/SceneAccessory.js')(Accessory, Service, Characteristic);
     DeviceAccessory = require('./lib/DeviceAccessory.js')(Accessory, Service, Characteristic);
     SensorAccessory = require('./lib/SensorAccessory.js')(Accessory, Service, Characteristic);
-    ThermostatAccessory = require('.lib/ThermostatAccessory.js')(Accessory, Service, Characteristic);
+    ThermostatAccessory = require('./lib/ThermostatAccessory.js')(Accessory, Service, Characteristic);
 
 
     homebridge.registerPlatform("homebridge-mqttCtrl", "mqttCtrlPlatform", mqttCtrlPlatform, false);
@@ -49,10 +49,13 @@ function mqttCtrlPlatform(log, config, api) {
     this.sensorAccessoryArray = [];
     this.thermostatAccessoryArray = [];
 
+    this.mqttConected = false;
+    this.mqttMsgArray = [];
+
 
     this.url = config["MQTT_url"];
     this.publish_options = {
-        qos: 1
+        qos: 2
     };
     this.options = {
         keepalive: 10,
@@ -79,6 +82,7 @@ function mqttCtrlPlatform(log, config, api) {
     this.client.on('connect', function () {
         that.log('MQTT connected, client id:' + that.options.clientId);
         that.client.subscribe(that.topicSub);
+        this.mqttConected = true;
     })
 
     this.client.on('message', function (topic, message) {
@@ -292,7 +296,7 @@ mqttCtrlPlatform.prototype.configureAccessory = function(accessory) {
                     accessory.addService(Service.BatteryService, object.name+"-Battery");
                 }
 
-                var sensorAccessory = new SensorAccessory(platform.log, accessory, Service, Characteristic);
+                var sensorAccessory = new SensorAccessory(platform.log, accessory);
                 platform.sensorAccessoryArray.push(sensorAccessory);
 
                 accessory.getService(Service.TemperatureSensor)
@@ -339,47 +343,57 @@ mqttCtrlPlatform.prototype.configureAccessory = function(accessory) {
                 this.mqttPub(reqStatusMsg);
             }
             break;
-            case THEROSTAT_OBJ_TYPE:
+            case THERMOSTAT_OBJ_TYPE:
               {
-                    if(!accessory.getService(Service.Thermostat))
-                      {
-                        accessory.addService(Service.Thermostat, object.name);
-                      }
+                if(!accessory.getService(Service.Thermostat))
+                {
+                  accessory.addService(Service.Thermostat, object.name);
+                }
 
-                    var thermostatAccessory = new ThermostatAccessory(platform.log, accessory, Service, Characteristic);
-                    platform.thermostatAccessoryArray.push(thermostatAccessory);
+                var thermostatAccessory = new ThermostatAccessory(platform.log, accessory, platform.client, platform.topicPub); //Service, Characteristic);
+                platform.thermostatAccessoryArray.push(thermostatAccessory);
 
 
-                    accessory.service.getCharacteristic(Characteristic.TargetTemperature)
+
+                accessory.getService(Service.Thermostat)
+                  .getCharacteristic(Characteristic.TargetTemperature)
                   .setProps({
-                      maxValue: 30,
-                      minValue: 18,
-                      minStep: 1
+                    maxValue: 31,
+                    minValue: 16,
+                    minStep: 1
                     })
-                  .on('set', this.setTargetTemperature.bind(this))
-                  .on('get', this.getTargetTemperature.bind(this));
+                  //.on('set', this.setTargetTemperature.bind(thermostatAccessory))
+                  .on('get', thermostatAccessory.getTargetTemperature.bind(thermostatAccessory))
+                  .on('set', thermostatAccessory.setTargetTemperature.bind(thermostatAccessory));
 
-                accessory.service.getCharacteristic(Characteristic.TargetHeatingCoolingState)
-                  .on('set', this.setTargetHeatingCoolingState.bind(this))
-                  .on('get', this.getTargetHeatingCoolingState.bind(this));
+                accessory.getService(Service.Thermostat)
+                  .getCharacteristic(Characteristic.TargetHeatingCoolingState)
+                  //.on('set', this.setTargetHeatingCoolingState.bind(thermostatAccessory))
+                  .on('get', thermostatAccessory.getTargetHeatingCoolingState.bind(thermostatAccessory))
+                  .on('set', thermostatAccessory.setTargetHeatingCoolingState.bind(thermostatAccessory));
 
-                accessory.service.getCharacteristic(Characteristic.CurrentTemperature)
+                accessory.getService(Service.Thermostat)
+                  .getCharacteristic(Characteristic.CurrentTemperature)
                   .setProps({
                     maxValue: 100,
                     minValue: 0,
                     minStep: 0.01
                     })
-                  .on('get', this.getCurrentTemperature.bind(this));
+                  .on('get', thermostatAccessory.getCurrentTemperature.bind(thermostatAccessory));
 
-                accessory.service.getCharacteristic(Characteristic.TemperatureDisplayUnits)
-                  .on('get', this.getTemperatureDisplayUnits.bind(this));
+                accessory.getService(Service.Thermostat)
+                  .getCharacteristic(Characteristic.TemperatureDisplayUnits)
+                  .on('get', thermostatAccessory.getTemperatureDisplayUnits.bind(thermostatAccessory));
 
-                accessory.service.getCharacteristic(Characteristic.CurrentHeatingCoolingState)
-                  .on('get', this.getCurrentHeatingCoolingState.bind(this));
+                accessory.getService(Service.Thermostat)
+                  .getCharacteristic(Characteristic.CurrentHeatingCoolingState)
+                  .on('get', thermostatAccessory.getCurrentHeatingCoolingState.bind(thermostatAccessory));
 
               var reqStatusMsg = '{"message":"request status","device":{"address":"' + object.id + '"}}';
               this.mqttPub(reqStatusMsg);
+
             }
+            break;
         default:
             platform.log("unknown object type:" + object.type);
             return;
@@ -422,9 +436,28 @@ mqttCtrlPlatform.prototype.removeAccessory = function(accessory) {
     this.accessories = [];
 }
 
-mqttCtrlPlatform.prototype.mqttPub = function(message) {
-    var platform = this;
-    this.log("mqttPub function:"+message);
+//check if connection to mqttServer has been established;
+//if not, store messages in mqttMsgArray
+//if connection was established, check if there are items in mqttMsgArray that need to be send; acces and send them; probably also need to first push new message to array; otherwise it will not be sent
+//else just send new message
+if (this.mqttConected === false) {
+  this.mqttMsgArray.push(message);
+} else if (this.mqttMsgArray.length != 0){
+    this.mqttMsgArray.push(message);
+    for (i = 0, i < this.mqttMsgArray.length, i++) {
+      this.mqttMsgArray.[i] = message;
+      mqttCtrlPlatform.prototype.mqttPub = function(message) {
+          var platform = this;
+          this.log("mqttPub function:"+message);
 
-    platform.client.publish(platform.topicPub, message, platform.publish_options);
-}
+          platform.client.publish(platform.topicPub, message, platform.publish_options);
+      }
+    }
+  } else {
+      mqttCtrlPlatform.prototype.mqttPub = function(message) {
+          var platform = this;
+          this.log("mqttPub function:"+message);
+
+          platform.client.publish(platform.topicPub, message, platform.publish_options);
+      }
+    };
